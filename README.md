@@ -57,9 +57,6 @@ cp .env.template .env
 
 ```bash
 NEXT_PUBLIC_CROSSMINT_API_KEY=your_api_key
-NEXT_PUBLIC_CHAIN=base-sepolia
-
-WIREX_API_KEY=your_wirex_api_key
 ```
 
 5. Run the development server:
