@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wallets & Wirex Quickstart",
-  description: "A quickstart for Crossmint Wallets & Wirex",
+  title: "Wallets & Wirex Demo",
+  description: "A demo for Crossmint Wallets & Wirex",
 };
 
 export default function RootLayout({

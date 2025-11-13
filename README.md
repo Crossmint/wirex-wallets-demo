@@ -2,7 +2,7 @@
 <img width="200" alt="Image" src="https://github.com/user-attachments/assets/8b617791-cd37-4a5a-8695-a7c9018b7c70" />
 <br>
 <br>
-<h1>Crossmint Wallets & Wirex Quickstart</h1>
+<h1>Crossmint Wallets & Wirex demo</h1>
 
 <div align="center">
 <a href="https://wirex-wallets-demo.vercel.app/">Live Demo</a> | <a href="https://docs.crossmint.com/introduction/platform/wallets">Docs</a> | <a href="https://www.crossmint.com/quickstarts">See all quickstarts</a>
@@ -14,7 +14,7 @@
 
 ## Introduction
 
-This quickstart demonstrates how to integrate Wirex's Pay API platform with Crossmint wallets to build a complete crypto-to-debit card application. You'll learn how to create an app where users can sign up, get approved for cards, and fund them directly from their Crossmint wallets.
+This demo demonstrates how to integrate Wirex's Pay API platform with Crossmint wallets to build a complete crypto-to-debit card application. You'll learn how to create an app where users can sign up, get approved for cards, and fund them directly from their Crossmint wallets.
 
 **Learn how to:**
 
