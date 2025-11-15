@@ -4,7 +4,7 @@ import {
   useWallet,
   Wallet,
 } from "@crossmint/client-sdk-react-ui";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 
 import { getContracts } from "@/actions/contract";
@@ -13,10 +13,11 @@ import {
   getWirexUser,
   getVerificationLink,
   sendSmsConfirmation,
-  WirexUser,
+  verifySmsConfirmation,
 } from "@/actions/wirex";
+import { useWirex } from "@/hooks/useWirex";
 
-type OnboardingStep =
+export type OnboardingStep =
   | "initial"
   | "onchain-onboarding"
   | "creating-wirex-user"
@@ -25,125 +26,28 @@ type OnboardingStep =
   | "sms-confirmation"
   | "completed";
 
-export function WirexCompleteFlow() {
+export function WirexOnboardFlow() {
   const { user } = useAuth();
   const { getOrCreateWallet, wallet } = useWallet();
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>("initial");
-  const [error, setError] = useState<string | null>(null);
-  const [verificationLink, setVerificationLink] = useState<string | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
-  const [wirexUser, setWirexUser] = useState<WirexUser | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+
+  const {
+    currentStep,
+    setCurrentStep,
+    walletAddress,
+    setWalletAddress,
+    error,
+    setError,
+    verificationLink,
+    setVerificationLink,
+    isCheckingStatus,
+    wirexUser,
+    setWirexUser,
+    smsSessionId,
+    setSmsSessionId,
+  } = useWirex();
 
   console.log("wirexUser", wirexUser);
-
-  // Check user status on mount
-  useEffect(() => {
-    const checkInitialStatus = async () => {
-      if (!user?.email) {
-        setIsCheckingStatus(false);
-        return;
-      }
-
-      try {
-        // Check if user already has a Wirex account
-        const wirexUser = await getWirexUser(user.email);
-        setWirexUser(wirexUser);
-        console.log("Found existing Wirex user:", wirexUser);
-
-        if (wallet?.address) {
-          setWalletAddress(wallet.address);
-        }
-
-        // Determine step based on user_actions
-        const userActions = wirexUser.user_actions || [];
-        const hasVerifyKYCAction = userActions.some(
-          (action) => action.type === "Verify"
-        );
-        const hasConfirmPhoneAction = userActions.some(
-          (action) => action.type === "ConfirmPhone"
-        );
-
-        if (userActions.length === 0) {
-          // No pending actions - user is fully onboarded
-          setCurrentStep("completed");
-        } else if (hasVerifyKYCAction) {
-          if (
-            wirexUser.verification_status === "Pending" ||
-            wirexUser.verification_status === "InReview"
-          ) {
-            setCurrentStep("kyc-pending");
-          } else {
-            setCurrentStep("kyc-verification");
-          }
-          try {
-            const link = await getVerificationLink(user.email);
-            setVerificationLink(link);
-          } catch (err) {
-            console.log("Could not get verification link:", err);
-          }
-        } else if (hasConfirmPhoneAction) {
-          setCurrentStep("sms-confirmation");
-        } else {
-          setCurrentStep("completed");
-        }
-      } catch (err) {
-        console.log("No existing Wirex user found, starting fresh");
-      } finally {
-        setIsCheckingStatus(false);
-      }
-    };
-
-    checkInitialStatus();
-  }, [user?.email, wallet?.address]);
-
-  // Poll user status when waiting for KYC verification
-  useEffect(() => {
-    // Only poll during KYC steps
-    const shouldPoll =
-      currentStep === "kyc-pending" || currentStep === "kyc-verification";
-
-    if (!shouldPoll || !user?.email) return;
-
-    const userEmail = user.email;
-    setIsPolling(true);
-    const pollInterval = setInterval(async () => {
-      try {
-        const updatedUser = await getWirexUser(userEmail);
-        setWirexUser(updatedUser);
-        console.log("Polling user status:", updatedUser);
-
-        const userActions = updatedUser.user_actions || [];
-        const hasVerifyKYCAction = userActions.some(
-          (action) => action.type === "Verify"
-        );
-
-        if (!hasVerifyKYCAction) {
-          setIsPolling(false);
-          clearInterval(pollInterval);
-
-          // Check if there are any remaining actions
-          const hasConfirmPhoneAction = userActions.some(
-            (action) => action.type === "ConfirmPhone"
-          );
-
-          if (hasConfirmPhoneAction) {
-            setCurrentStep("sms-confirmation");
-          } else {
-            setCurrentStep("completed");
-          }
-        }
-      } catch (err) {
-        console.error("Error polling user status:", err);
-      }
-    }, 5000); // Poll every 5 seconds
-
-    return () => {
-      clearInterval(pollInterval);
-      setIsPolling(false);
-    };
-  }, [currentStep, user?.email]);
 
   const onChainOnboardUser = async () => {
     if (!user?.email) {
@@ -260,32 +164,42 @@ export function WirexCompleteFlow() {
     }
   };
 
-  const handleSmsConfirmation = async () => {
+  const handleSendSmsConfirmation = async () => {
     if (!user?.email) return;
 
     try {
       setError(null);
 
-      await sendSmsConfirmation(user.email);
+      const smsConfirmation = await sendSmsConfirmation(user.email);
+      setSmsSessionId(smsConfirmation.session_id);
       console.log("SMS confirmation sent");
-
-      // Refresh user data to check if there are any remaining actions
-      const updatedUser = await getWirexUser(user.email);
-      setWirexUser(updatedUser);
-
-      const userActions = updatedUser.user_actions || [];
-      if (userActions.length === 0) {
-        setCurrentStep("completed");
-      } else {
-        // If there are still actions remaining, stay at current step
-        console.log("Remaining user actions:", userActions);
-      }
     } catch (err) {
       console.error("Error sending SMS confirmation:", err);
       setError(
         err instanceof Error ? err.message : "Failed to send SMS confirmation"
       );
       // Stay at sms-confirmation step to allow retry
+    }
+  };
+
+  const handleVerifySmsConfirmation = async () => {
+    if (!user?.email || !smsSessionId || !otpCode) return;
+
+    try {
+      setError(null);
+
+      await verifySmsConfirmation(user.email, otpCode, smsSessionId);
+      console.log("SMS confirmation completed");
+
+      // Move to completed step
+      setCurrentStep("completed");
+    } catch (err) {
+      console.error("Error verifying SMS confirmation:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to complete SMS confirmation"
+      );
     }
   };
 
@@ -557,15 +471,41 @@ export function WirexCompleteFlow() {
               <h3 className="text-lg font-semibold">Almost Done!</h3>
             </div>
             <p className="text-gray-600 mb-4">
-              Your identity has been verified. Click below to send the SMS
-              confirmation.
+              {!smsSessionId
+                ? "Your identity has been verified. Click below to send the SMS confirmation."
+                : "Enter the confirmation code sent to your phone."}
             </p>
-            <button
-              onClick={handleSmsConfirmation}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-            >
-              Send SMS Confirmation
-            </button>
+            {!smsSessionId ? (
+              <button
+                onClick={handleSendSmsConfirmation}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+              >
+                Send SMS Confirmation
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleVerifySmsConfirmation();
+                    }
+                  }}
+                  placeholder="Enter OTP code"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  autoFocus
+                />
+                <button
+                  onClick={handleVerifySmsConfirmation}
+                  disabled={!otpCode}
+                  className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
+                >
+                  Confirm Code
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -615,9 +555,6 @@ export function WirexCompleteFlow() {
           <p className="font-mono">
             <strong>Verification Link:</strong>{" "}
             {verificationLink ? "Yes" : "No"}
-          </p>
-          <p className="font-mono">
-            <strong>Polling:</strong> {isPolling ? "Yes" : "No"}
           </p>
           <p className="font-mono">
             <strong>Initial Check:</strong>{" "}

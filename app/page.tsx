@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
+import { useAuth } from "@crossmint/client-sdk-react-ui";
 import { LandingPage } from "@/components/landing-page";
 import { CSSTransition, SwitchTransition } from "react-transition-group";
 import { Dashboard } from "@/components/dashboard";

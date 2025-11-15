@@ -188,7 +188,16 @@ export async function getVerificationLink(email: string): Promise<string> {
 /**
  * Step 4: Send SMS confirmation
  */
-export async function sendSmsConfirmation(email: string): Promise<void> {
+type SmsConfirmationResponse = {
+  session_id: string;
+  attempts_left: number;
+  expires_at: string;
+  code_length: number;
+  resend_at: string;
+};
+export async function sendSmsConfirmation(
+  email: string
+): Promise<SmsConfirmationResponse> {
   const token = await getWirexToken();
 
   const response = await fetch(`${WIREX_API_BASE}/confirmation/sms`, {
@@ -200,7 +209,7 @@ export async function sendSmsConfirmation(email: string): Promise<void> {
       "X-User-Email": email,
     },
     body: JSON.stringify({
-      action_type: "ConfirmPhone",
+      action_type: "VerifyPhone",
     }),
   });
 
@@ -208,8 +217,62 @@ export async function sendSmsConfirmation(email: string): Promise<void> {
     const error = await response.text();
     throw new Error(`Failed to send SMS confirmation: ${error}`);
   }
+  return await response.json();
 }
 
+export async function verifySmsConfirmation(
+  email: string,
+  code: string,
+  sessionId: string
+): Promise<void> {
+  const token = await getWirexToken();
+
+  // Verify sms confirmation code, return a token to be used in the next request
+  const verifyResponse = await fetch(
+    `${WIREX_API_BASE}/confirmation/sms/verify`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "X-Chain-Id": WIREX_CHAIN_ID,
+        "X-User-Email": email,
+      },
+      body: JSON.stringify({
+        code,
+        session_id: sessionId,
+      }),
+    }
+  );
+
+  if (!verifyResponse.ok) {
+    const error = await verifyResponse.text();
+    throw new Error(`Step 1: Failed to complete SMS confirmation: ${error}`);
+  }
+  const verifyResponseData = await verifyResponse.json();
+
+  // Confirm phone number by hitting action endpoint
+  const confirmPhoneNumberResponse = await fetch(
+    `${WIREX_API_BASE}/user/phone-number/confirm`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "X-Chain-Id": WIREX_CHAIN_ID,
+        "X-User-Email": email,
+      },
+      body: JSON.stringify({
+        action_token: verifyResponseData.token,
+      }),
+    }
+  );
+
+  if (!confirmPhoneNumberResponse.ok) {
+    const error = await confirmPhoneNumberResponse.text();
+    throw new Error(`Step 2: Failed to confirm phone number: ${error}`);
+  }
+}
 /**
  * Get the Bearer token for SDK initialization
  * This exposes the token to the client for SDK use

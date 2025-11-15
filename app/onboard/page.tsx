@@ -1,19 +1,22 @@
-import { Footer } from "./footer";
-import { LogoutButton } from "./logout";
+"use client";
+
 import Image from "next/image";
-import { useWirex } from "@/hooks/useWirex";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Footer } from "@/components/footer";
+import { LogoutButton } from "@/components/logout";
+import { WirexOnboardFlow } from "@/components/wirex-onboard-flow";
+import { useWirex } from "@/hooks/useWirex";
 
-export function Dashboard() {
+export default function OnboardPage() {
   const router = useRouter();
-  const { currentStep, isCheckingStatus } = useWirex();
+  const { currentStep } = useWirex();
 
   useEffect(() => {
-    if (currentStep !== "completed" && !isCheckingStatus) {
-      router.push("/onboard");
+    if (currentStep === "completed") {
+      router.push("/");
     }
-  }, [currentStep, isCheckingStatus]);
+  }, [currentStep]);
 
   return (
     <div className="min-h-screen bg-gray-50 content-center">
@@ -38,14 +41,11 @@ export function Dashboard() {
         {/* Dashboard Header */}
         <div className="flex flex-col gap-4 bg-white rounded-2xl border shadow-sm p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Home</h2>
+            <h2 className="text-xl font-semibold">Dashboard</h2>
             <LogoutButton />
           </div>
 
-          {/* TODO: Add cards and features for onboarded Wirex users */}
-          <div className="text-center py-8 text-gray-600">
-            <p>Welcome! Your Wirex cards and features will appear here.</p>
-          </div>
+          <WirexOnboardFlow />
         </div>
       </div>
       <Footer />
