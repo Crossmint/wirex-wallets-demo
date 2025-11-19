@@ -1,19 +1,13 @@
+import { useWirex } from "@/hooks/useWirex";
 import { Footer } from "./footer";
 import { LogoutButton } from "./logout";
 import Image from "next/image";
-import { useWirex } from "@/hooks/useWirex";
+import { issueVirtualCard } from "@/actions/wirex";
+import { useWallet } from "@crossmint/client-sdk-react-ui";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 export function Dashboard() {
-  const router = useRouter();
-  const { currentStep, isCheckingStatus } = useWirex();
-
-  useEffect(() => {
-    if (currentStep !== "completed" && !isCheckingStatus) {
-      router.push("/onboard");
-    }
-  }, [currentStep, isCheckingStatus]);
+  const { virtualCards, wirexUser } = useWirex();
 
   return (
     <div className="min-h-screen bg-gray-50 content-center">
@@ -42,10 +36,38 @@ export function Dashboard() {
             <LogoutButton />
           </div>
 
-          {/* TODO: Add cards and features for onboarded Wirex users */}
-          <div className="text-center py-8 text-gray-600">
-            <p>Welcome! Your Wirex cards and features will appear here.</p>
-          </div>
+          <>
+            {/* TODO: Add cards and features for onboarded Wirex users */}
+            <div className="text-center py-8 text-gray-600">
+              <p>Welcome! Your Wirex cards and features will appear here.</p>
+            </div>
+
+            <button
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => {
+                if (!wirexUser?.email) {
+                  console.error("User email not found");
+                  return;
+                }
+                issueVirtualCard(
+                  wirexUser.email,
+                  wirexUser.personal_info.first_name +
+                    " " +
+                    wirexUser.personal_info.last_name
+                );
+              }}
+              disabled={!wirexUser?.email}
+            >
+              Create Virtual Card
+            </button>
+
+            {virtualCards && (
+              <div className="text-center py-8 text-gray-600">
+                <p>Virtual cards:</p>
+                <pre>{JSON.stringify(virtualCards, null, 2)}</pre>
+              </div>
+            )}
+          </>
         </div>
       </div>
       <Footer />

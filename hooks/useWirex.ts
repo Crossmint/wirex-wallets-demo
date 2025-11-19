@@ -1,4 +1,8 @@
-import { getWirexUser, WirexUser } from "@/actions/wirex";
+import {
+  getVirtualCards as getVirtualCardsAction,
+  getWirexUser,
+  WirexUser,
+} from "@/actions/wirex";
 import { OnboardingStep } from "@/components/wirex-onboard-flow";
 import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
 import { useEffect, useState } from "react";
@@ -13,6 +17,8 @@ export function useWirex() {
   const [error, setError] = useState<string | null>(null);
   const [verificationLink, setVerificationLink] = useState<string | null>(null);
   const [smsSessionId, setSmsSessionId] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
+  const [virtualCards, setVirtualCards] = useState<unknown | null>(null);
 
   useEffect(() => {
     const checkInitialStatus = async () => {
@@ -39,6 +45,13 @@ export function useWirex() {
         const hasConfirmPhoneAction = userActions.some(
           (action) => action.type === "ConfirmPhone"
         );
+
+        const isApproved = wirexUser.verification_status === "Approved";
+        setIsApproved(isApproved);
+
+        if (isApproved && !hasConfirmPhoneAction) {
+          setCurrentStep("completed");
+        }
 
         if (userActions.length === 0) {
           // No pending actions - user is fully onboarded
@@ -67,6 +80,21 @@ export function useWirex() {
     checkInitialStatus();
   }, [user?.email, wallet?.address]);
 
+  async function fetchAndeSetVirtualCards() {
+    if (!isApproved || !user?.email) {
+      console.log("User is not approved, cannot get virtual cards");
+      return;
+    }
+    const virtualCards = await getVirtualCardsAction(user.email);
+    setVirtualCards(virtualCards);
+  }
+
+  useEffect(() => {
+    if (isApproved && !isCheckingStatus) {
+      fetchAndeSetVirtualCards();
+    }
+  }, [isApproved, isCheckingStatus]);
+
   return {
     currentStep,
     setCurrentStep,
@@ -82,5 +110,7 @@ export function useWirex() {
     setSmsSessionId,
     wirexUser,
     setWirexUser,
+    isApproved,
+    virtualCards,
   };
 }

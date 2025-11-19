@@ -1,7 +1,7 @@
 "use server";
 
 const WIREX_AUTH_URL = "https://wirex-pay-dev.eu.auth0.com/oauth/token";
-const WIREX_API_BASE = "https://api-business.wirexpaychain.tech/api/v1";
+const WIREX_API_BASE = "https://api-baas.wirexapp.tech/api/v1";
 const WIREX_CHAIN_ID = "9223372036854775806";
 const WIREX_AUDIENCE = "https://api-business.wirexpaychain.tech";
 
@@ -273,10 +273,44 @@ export async function verifySmsConfirmation(
     throw new Error(`Step 2: Failed to confirm phone number: ${error}`);
   }
 }
-/**
- * Get the Bearer token for SDK initialization
- * This exposes the token to the client for SDK use
- */
-export async function getWirexBearerToken(): Promise<string> {
-  return await getWirexToken();
+
+export async function issueVirtualCard(email: string, fullName: string) {
+  const token = await getWirexToken();
+  const response = await fetch(`${WIREX_API_BASE}/cards/virtual`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "X-Chain-Id": WIREX_CHAIN_ID,
+      "X-User-Email": email,
+    },
+    body: JSON.stringify({
+      card_name: "Virtual Card",
+      name_on_card: fullName,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to issue virtual card: ${error}`);
+  }
+  return await response.json();
+}
+
+export async function getVirtualCards(email: string) {
+  const token = await getWirexToken();
+  const response = await fetch(`${WIREX_API_BASE}/cards`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Chain-Id": WIREX_CHAIN_ID,
+      "X-User-Email": email,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to get virtual cards: ${error}`);
+  }
+  return await response.json();
 }

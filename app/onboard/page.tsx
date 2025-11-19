@@ -1,23 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Footer } from "@/components/footer";
 import { LogoutButton } from "@/components/logout";
 import { WirexOnboardFlow } from "@/components/wirex-onboard-flow";
-import { useWirex } from "@/hooks/useWirex";
 
 export default function OnboardPage() {
-  const router = useRouter();
-  const { currentStep } = useWirex();
-
-  useEffect(() => {
-    if (currentStep === "completed") {
-      router.push("/");
-    }
-  }, [currentStep]);
-
   return (
     <div className="min-h-screen bg-gray-50 content-center">
       <div className="w-full max-w-7xl mx-auto px-4 py-6 sm:pt-8">

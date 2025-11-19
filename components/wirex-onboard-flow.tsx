@@ -4,8 +4,9 @@ import {
   useWallet,
   Wallet,
 } from "@crossmint/client-sdk-react-ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { getContracts } from "@/actions/contract";
 import {
@@ -28,8 +29,10 @@ export type OnboardingStep =
 
 export function WirexOnboardFlow() {
   const { user } = useAuth();
-  const { getOrCreateWallet, wallet } = useWallet();
+  const { getOrCreateWallet } = useWallet();
   const [otpCode, setOtpCode] = useState("");
+
+  const router = useRouter();
 
   const {
     currentStep,
@@ -45,9 +48,16 @@ export function WirexOnboardFlow() {
     setWirexUser,
     smsSessionId,
     setSmsSessionId,
+    isApproved,
   } = useWirex();
 
   console.log("wirexUser", wirexUser);
+
+  useEffect(() => {
+    if (isApproved && !isCheckingStatus) {
+      router.push("/");
+    }
+  }, [isApproved, isCheckingStatus]);
 
   const onChainOnboardUser = async () => {
     if (!user?.email) {
@@ -64,16 +74,24 @@ export function WirexOnboardFlow() {
       console.log("contracts", contracts);
       console.log("fundsOracle", fundsOracle);
 
+      if (fundsOracle == null) {
+        throw new Error(
+          "Funds oracle not found, this must exist in order to register the wallet"
+        );
+      }
+
       // Create a wallet for the user (client side)
       const crossmintWallet = (await getOrCreateWallet({
         chain: "stellar",
         plugins: [contracts.ExecutionDelayPolicy],
         signer: {
           type: "email",
-          email: user?.email,
+          email: user.email,
         },
         delegatedSigners: [{ signer: "external-wallet:" + fundsOracle }],
       })) as Wallet<"stellar">;
+
+      console.log("crossmintWallet", crossmintWallet);
 
       setWalletAddress(crossmintWallet.address);
 
