@@ -1,11 +1,12 @@
+import { useEffect, useState } from "react";
+import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
 import {
   getVirtualCards as getVirtualCardsAction,
   getWirexUser,
   WirexUser,
 } from "@/actions/wirex";
 import { OnboardingStep } from "@/components/wirex-onboard-flow";
-import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
-import { useEffect, useState } from "react";
+import { VirtualCard } from "@/types/card";
 
 export function useWirex() {
   const { user } = useAuth();
@@ -17,8 +18,12 @@ export function useWirex() {
   const [error, setError] = useState<string | null>(null);
   const [verificationLink, setVerificationLink] = useState<string | null>(null);
   const [smsSessionId, setSmsSessionId] = useState<string | null>(null);
-  const [isApproved, setIsApproved] = useState(false);
-  const [virtualCards, setVirtualCards] = useState<unknown | null>(null);
+  const [virtualCards, setVirtualCards] = useState<Array<VirtualCard> | null>(
+    null
+  );
+
+  // Derived state - user is approved when verification status is "Approved"
+  const isApproved = wirexUser?.verification_status === "Approved";
 
   useEffect(() => {
     const checkInitialStatus = async () => {
@@ -29,7 +34,12 @@ export function useWirex() {
 
       try {
         // Check if user already has a Wirex account
-        const wirexUser = await getWirexUser(user.email);
+        const { user: wirexUser, exists } = await getWirexUser(user.email);
+        if (!exists) {
+          setCurrentStep("initial");
+          return;
+        }
+
         setWirexUser(wirexUser);
         console.log("Found existing Wirex user:", wirexUser);
 
@@ -46,14 +56,11 @@ export function useWirex() {
           (action) => action.type === "ConfirmPhone"
         );
 
-        const isApproved = wirexUser.verification_status === "Approved";
-        setIsApproved(isApproved);
+        const approved = wirexUser.verification_status === "Approved";
 
-        if (isApproved && !hasConfirmPhoneAction) {
+        if (approved && !hasConfirmPhoneAction) {
           setCurrentStep("completed");
-        }
-
-        if (userActions.length === 0) {
+        } else if (userActions.length === 0) {
           // No pending actions - user is fully onboarded
           setCurrentStep("completed");
         } else if (hasVerifyKYCAction) {
@@ -86,7 +93,7 @@ export function useWirex() {
       return;
     }
     const virtualCards = await getVirtualCardsAction(user.email);
-    setVirtualCards(virtualCards);
+    setVirtualCards(virtualCards.data);
   }
 
   useEffect(() => {

@@ -1,5 +1,7 @@
 "use server";
 
+import { VirtualCardDetails } from "@/types/card";
+
 const WIREX_AUTH_URL = "https://wirex-pay-dev.eu.auth0.com/oauth/token";
 const WIREX_API_BASE = "https://api-baas.wirexapp.tech/api/v1";
 const WIREX_CHAIN_ID = "9223372036854775806";
@@ -140,9 +142,12 @@ export async function createWirexUser(
 /**
  * Step 2.5: Get existing Wirex user
  */
-export async function getWirexUser(email: string): Promise<WirexUser> {
+export async function getWirexUser(
+  email: string
+): Promise<{ user: WirexUser; exists: boolean }> {
   const token = await getWirexToken();
 
+  let exists = false;
   const response = await fetch(`${WIREX_API_BASE}/user`, {
     method: "GET",
     headers: {
@@ -152,12 +157,11 @@ export async function getWirexUser(email: string): Promise<WirexUser> {
     },
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to get Wirex user: ${error}`);
+  if (response.ok) {
+    exists = true;
   }
 
-  return await response.json();
+  return { user: await response.json(), exists };
 }
 
 /**
@@ -181,7 +185,6 @@ export async function getVerificationLink(email: string): Promise<string> {
   }
 
   const data: { redirect_uri: string } = await response.json();
-  console.log("Verification link:", data);
   return data.redirect_uri;
 }
 
@@ -313,4 +316,81 @@ export async function getVirtualCards(email: string) {
     throw new Error(`Failed to get virtual cards: ${error}`);
   }
   return await response.json();
+}
+
+export async function verifyWalletSignature(
+  payload: {
+    action_type: "GetCardDetails" | "3dsChallenge" | "VerifyPhone";
+    nonce: number;
+    message_signature: string;
+  },
+  email: string
+) {
+  const token = await getWirexToken();
+  const response = await fetch(
+    `${WIREX_API_BASE}/confirmation/signature/verify`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "X-Chain-Id": WIREX_CHAIN_ID,
+        "X-User-Email": email,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to verify wallet signature: ${error}`);
+  }
+  const responseData = await response.json();
+  return responseData.action_token as string;
+}
+
+export async function getCardCvvAndNumber(
+  email: string,
+  cardId: string,
+  actionToken: string
+): Promise<VirtualCardDetails> {
+  const token = await getWirexToken();
+
+  const request = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "X-Chain-Id": WIREX_CHAIN_ID,
+      "X-User-Email": email,
+    },
+    body: JSON.stringify({
+      action_token: actionToken,
+    }),
+  };
+  const cardDetailsResponse = await fetch(
+    `${WIREX_API_BASE}/cards/${cardId}/details`,
+    request
+  );
+
+  const cardCvvResponse = await fetch(
+    `${WIREX_API_BASE}/cards/${cardId}/cvv`,
+    request
+  );
+
+  if (!cardDetailsResponse.ok) {
+    const error = await cardDetailsResponse.text();
+    throw new Error(`Failed to get card details: ${error}`);
+  }
+  if (!cardCvvResponse.ok) {
+    const error = await cardCvvResponse.text();
+    throw new Error(`Failed to get card cvv: ${error}`);
+  }
+
+  const cardDetails = await cardDetailsResponse.json();
+  const cardCvv = await cardCvvResponse.json();
+  return {
+    card_number: cardDetails.card_number as string,
+    cvv: cardCvv.cvv as string,
+  };
 }

@@ -6,7 +6,6 @@ import {
 } from "@crossmint/client-sdk-react-ui";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 
 import { getContracts } from "@/actions/contract";
 import {
@@ -32,8 +31,6 @@ export function WirexOnboardFlow() {
   const { getOrCreateWallet } = useWallet();
   const [otpCode, setOtpCode] = useState("");
 
-  const router = useRouter();
-
   const {
     currentStep,
     setCurrentStep,
@@ -48,16 +45,9 @@ export function WirexOnboardFlow() {
     setWirexUser,
     smsSessionId,
     setSmsSessionId,
-    isApproved,
   } = useWirex();
 
   console.log("wirexUser", wirexUser);
-
-  useEffect(() => {
-    if (isApproved && !isCheckingStatus) {
-      router.push("/");
-    }
-  }, [isApproved, isCheckingStatus]);
 
   const onChainOnboardUser = async () => {
     if (!user?.email) {
@@ -70,9 +60,6 @@ export function WirexOnboardFlow() {
 
       // Get contracts from our server action (server side)
       const { contracts, fundsOracle } = await getContracts();
-
-      console.log("contracts", contracts);
-      console.log("fundsOracle", fundsOracle);
 
       if (fundsOracle == null) {
         throw new Error(
@@ -90,8 +77,12 @@ export function WirexOnboardFlow() {
         },
         delegatedSigners: [{ signer: "external-wallet:" + fundsOracle }],
       })) as Wallet<"stellar">;
+      const signerAddress = crossmintWallet.signer.address?.();
 
-      console.log("crossmintWallet", crossmintWallet);
+      if (signerAddress == null) {
+        // should never happen but just to satisfy TS
+        throw new Error("Signer address not found");
+      }
 
       setWalletAddress(crossmintWallet.address);
 
@@ -111,14 +102,12 @@ export function WirexOnboardFlow() {
         args: {
           parent_entity: "00000000000000000000000000000027",
           wallet: crossmintWallet.address,
-          owner: crossmintWallet.address,
+          owner: signerAddress,
         },
       });
 
-      console.log("corpReg", corpReg);
-
       // Move to Wirex user onboarding flow
-      await createWirexUserFlow(crossmintWallet.address);
+      await createWirexUserFlow(signerAddress);
     } catch (err) {
       console.error("Error onboarding user:", err);
       setError(
@@ -134,20 +123,17 @@ export function WirexOnboardFlow() {
     try {
       setCurrentStep("creating-wirex-user");
       setError(null);
+      const { user: existingUser, exists } = await getWirexUser(user.email);
 
-      // Try to get existing user first
-      let wirexUser;
-      try {
-        wirexUser = await getWirexUser(user.email);
+      if (exists) {
         console.log("Existing Wirex user found:", wirexUser);
-      } catch (err) {
-        // User doesn't exist, create new one
+        setWirexUser(existingUser);
+      } else {
         console.log("Creating new Wirex user...");
-        wirexUser = await createWirexUser(user.email, "US", walletAddr);
-        console.log("Wirex user created:", wirexUser);
+        const newUser = await createWirexUser(user.email, "GB", walletAddr);
+        console.log("Wirex user created:", newUser);
+        setWirexUser(newUser);
       }
-
-      setWirexUser(wirexUser);
 
       // Get KYC verification link
       await initiateKycVerification();

@@ -2,12 +2,11 @@ import { useWirex } from "@/hooks/useWirex";
 import { Footer } from "./footer";
 import { LogoutButton } from "./logout";
 import Image from "next/image";
-import { issueVirtualCard } from "@/actions/wirex";
-import { useWallet } from "@crossmint/client-sdk-react-ui";
-import { useEffect } from "react";
+import { WirexOnboardFlow } from "./wirex-onboard-flow";
+import { WirexDashboard } from "./wirex-dashboard";
 
 export function Dashboard() {
-  const { virtualCards, wirexUser } = useWirex();
+  const { isApproved, isCheckingStatus } = useWirex();
 
   return (
     <div className="min-h-screen bg-gray-50 content-center">
@@ -32,42 +31,18 @@ export function Dashboard() {
         {/* Dashboard Header */}
         <div className="flex flex-col gap-4 bg-white rounded-2xl border shadow-sm p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Home</h2>
+            <h2 className="text-xl font-semibold">
+              {!isCheckingStatus && !isApproved ? "Onboarding" : "Home"}
+            </h2>
             <LogoutButton />
           </div>
 
-          <>
-            {/* TODO: Add cards and features for onboarded Wirex users */}
-            <div className="text-center py-8 text-gray-600">
-              <p>Welcome! Your Wirex cards and features will appear here.</p>
-            </div>
-
-            <button
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={() => {
-                if (!wirexUser?.email) {
-                  console.error("User email not found");
-                  return;
-                }
-                issueVirtualCard(
-                  wirexUser.email,
-                  wirexUser.personal_info.first_name +
-                    " " +
-                    wirexUser.personal_info.last_name
-                );
-              }}
-              disabled={!wirexUser?.email}
-            >
-              Create Virtual Card
-            </button>
-
-            {virtualCards && (
-              <div className="text-center py-8 text-gray-600">
-                <p>Virtual cards:</p>
-                <pre>{JSON.stringify(virtualCards, null, 2)}</pre>
-              </div>
-            )}
-          </>
+          {/* Show onboard flow if not approved, otherwise show dashboard content */}
+          {!isCheckingStatus && !isApproved ? (
+            <WirexOnboardFlow />
+          ) : (
+            <WirexDashboard />
+          )}
         </div>
       </div>
       <Footer />
