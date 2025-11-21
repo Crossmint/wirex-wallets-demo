@@ -1,31 +1,46 @@
+import { StellarWallet, useWallet } from "@crossmint/client-sdk-react-ui";
+import { useEffect, useState } from "react";
+import { Eye, EyeOff, Plus } from "lucide-react";
 import {
   getCardCvvAndNumber,
   issueVirtualCard,
   verifyWalletSignature,
 } from "@/actions/wirex";
 import { useWirex } from "@/hooks/useWirex";
-import { StellarWallet, useWallet } from "@crossmint/client-sdk-react-ui";
-import { useEffect, useState } from "react";
-import { Eye, EyeOff, Plus, Wallet } from "lucide-react";
 import { VirtualCardDetails } from "@/types/card";
 
 export function WirexDashboard() {
   const { getOrCreateWallet, wallet, status } = useWallet();
-  const { virtualCards, wirexUser, walletAddress } = useWirex();
+  const { virtualCards, wirexUser, fetchVirtualCards, isCheckingStatus } =
+    useWirex();
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
   const [cardDetails, setCardDetails] = useState<
     Record<string, VirtualCardDetails>
   >({});
   const [unmaskingCard, setUnmaskingCard] = useState<string | null>(null);
+  const [isWalletInitialized, setIsWalletInitialized] = useState(false);
+  const [isIssuingCard, setIsIssuingCard] = useState(false);
 
   useEffect(() => {
-    if (wirexUser?.wallet_address == null) {
+    if (wirexUser?.wallet_address == null || isWalletInitialized) {
       return;
     }
 
-    // Populate the wallet
-    getOrCreateWallet({ chain: "stellar", signer: { type: "email" } });
-  }, [wirexUser]);
+    // Populate the wallet only once
+    const initWallet = async () => {
+      try {
+        await getOrCreateWallet({
+          chain: "stellar",
+          signer: { type: "email" },
+        });
+        setIsWalletInitialized(true);
+      } catch (err) {
+        console.error("Error initializing wallet:", err);
+      }
+    };
+
+    initWallet();
+  }, [wirexUser?.wallet_address, isWalletInitialized, getOrCreateWallet]);
 
   const issueVirtualCardHandler = async () => {
     if (!wirexUser?.email) {
@@ -33,6 +48,7 @@ export function WirexDashboard() {
       return;
     }
 
+    setIsIssuingCard(true);
     try {
       await issueVirtualCard(
         wirexUser.email,
@@ -40,9 +56,12 @@ export function WirexDashboard() {
           " " +
           wirexUser.personal_info.last_name
       );
+      await fetchVirtualCards();
       console.log("Virtual card issued successfully");
     } catch (err) {
       console.error("Error issuing virtual card:", err);
+    } finally {
+      setIsIssuingCard(false);
     }
   };
 
@@ -100,65 +119,24 @@ export function WirexDashboard() {
     });
   };
 
-  //   const handleMintWirexToken = async () => {
-  //     if (wallet == null) {
-  //       console.error("Wallet not found");
-  //       return;
-  //     }
+  // Show loading state while wallet is being created or virtual cards are being fetched
+  const isLoadingWallet =
+    status === "in-progress" || (!wallet && wirexUser?.wallet_address);
+  const isLoadingCards = isCheckingStatus || (wirexUser && !virtualCards);
 
-  //     setIsFunding(true);
-  //     try {
-  //       const stellarWallet = StellarWallet.from(wallet);
-  //       const amountInStroops = 5 * 10_000_000; // 5 dollars in stroops
-
-  //       // CD7NDHRV5T63GKQQYJW2SCIWRH4CU4RMCUZH4VGTMVDQXB5DPZOVH3RP - wirex eurc contract addy
-  //       const mintTx = await stellarWallet.sendTransaction({
-  //         contractId: "CAGQ5E33PMSTGNNCDXQIUDIHYNF26NX4YS67UHKNVTUVTQLWBLDLR5EB", // wirex usdc contract addy
-  //         method: "mint",
-  //         args: {
-  //           to: wallet.address,
-  //           amount: amountInStroops,
-  //         },
-  //       });
-
-  //       console.log("✅ Wirex token minted:", mintTx);
-  //       return mintTx;
-  //     } catch (err) {
-  //       console.error("Error minting Wirex token:", err);
-  //       throw err;
-  //     } finally {
-  //       setIsFunding(false);
-  //     }
-  //   };
-
-  //   const sendFromWalletToTreasury = async () => {
-  //     if (wallet == null) {
-  //       console.error("Wallet not found");
-  //       return;
-  //     }
-
-  //     try {
-  //       const stellarWallet = StellarWallet.from(wallet);
-  //       const wirexUSDCContractTokenAddress =
-  //         "CAGQ5E33PMSTGNNCDXQIUDIHYNF26NX4YS67UHKNVTUVTQLWBLDLR5EB";
-  //       const tx = await stellarWallet.sendTransaction({
-  //         contractId: wirexUSDCContractTokenAddress,
-  //         method: "transfer",
-  //         args: {
-  //           from: wallet.address,
-  //           to: "GBF64R6BJCNC2E5OV4ANKZUNUJUY773WFTBF36ZNB4TSN7FCIWAUODON",
-  //           amount: 5 * 10_000_000,
-  //         },
-  //       });
-  //       console.log("✅ Tokens sent from wallet to treasury");
-  //       return tx;
-  //     } catch (err) {
-  //       console.error("Error sending tokens from wallet to treasury:", err);
-  //     }
-  //   };
-
-  if (status === "in-progress") {
-    return <div>Loading...</div>;
+  if (isLoadingWallet || isLoadingCards) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+          <p className="text-gray-600 text-sm">
+            {isLoadingWallet
+              ? "Setting up your wallet..."
+              : "Loading your cards..."}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const cards = virtualCards || [];
@@ -170,36 +148,22 @@ export function WirexDashboard() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Your Cards</h2>
         <div className="flex items-center gap-3">
-          {/* <button
-            onClick={sendFromWalletToTreasury}
-            className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            send tokens from my wallet to the treasury
-          </button>
-          <button
-            className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleMintWirexToken}
-            disabled={!wirexUser?.wallet_address || isFunding}
-          >
-            {isFunding ? (
-              <>
-                <div className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
-                <span>Funding...</span>
-              </>
-            ) : (
-              <>
-                <Wallet className="w-4 h-4" />
-                <span>Fund $5</span>
-              </>
-            )}
-          </button> */}
           <button
             className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={issueVirtualCardHandler}
-            disabled={!wirexUser?.email}
+            disabled={!wirexUser?.email || isIssuingCard}
           >
-            <Plus className="w-4 h-4" />
-            Create Card
+            {isIssuingCard ? (
+              <>
+                <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                <span>Creating...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                <span>Create Card</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -217,11 +181,18 @@ export function WirexDashboard() {
               Create your first virtual card to get started with Wirex
             </p>
             <button
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               onClick={issueVirtualCardHandler}
-              disabled={!wirexUser?.email}
+              disabled={!wirexUser?.email || isIssuingCard}
             >
-              Create Your First Card
+              {isIssuingCard ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-blue-300 border-t-white rounded-full animate-spin" />
+                  <span>Creating Card...</span>
+                </>
+              ) : (
+                "Create Your First Card"
+              )}
             </button>
           </div>
         </div>

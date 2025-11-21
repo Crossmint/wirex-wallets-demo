@@ -4,7 +4,7 @@ import {
   useWallet,
   Wallet,
 } from "@crossmint/client-sdk-react-ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 
 import { getContracts } from "@/actions/contract";
@@ -12,8 +12,6 @@ import {
   createWirexUser,
   getWirexUser,
   getVerificationLink,
-  sendSmsConfirmation,
-  verifySmsConfirmation,
 } from "@/actions/wirex";
 import { useWirex } from "@/hooks/useWirex";
 
@@ -23,13 +21,12 @@ export type OnboardingStep =
   | "creating-wirex-user"
   | "kyc-verification"
   | "kyc-pending"
-  | "sms-confirmation"
   | "completed";
 
 export function WirexOnboardFlow() {
   const { user } = useAuth();
   const { getOrCreateWallet } = useWallet();
-  const [otpCode, setOtpCode] = useState("");
+  const [isOnboarding, setIsOnboarding] = useState(false);
 
   const {
     currentStep,
@@ -43,8 +40,6 @@ export function WirexOnboardFlow() {
     isCheckingStatus,
     wirexUser,
     setWirexUser,
-    smsSessionId,
-    setSmsSessionId,
   } = useWirex();
 
   console.log("wirexUser", wirexUser);
@@ -54,7 +49,14 @@ export function WirexOnboardFlow() {
       setError("User email not found");
       return;
     }
+
+    if (isOnboarding) {
+      console.log("Onboarding already in progress, skipping...");
+      return;
+    }
+
     try {
+      setIsOnboarding(true);
       setCurrentStep("onchain-onboarding");
       setError(null);
 
@@ -114,6 +116,7 @@ export function WirexOnboardFlow() {
         err instanceof Error ? err.message : "Failed to onboard on-chain"
       );
       setCurrentStep("initial");
+      setIsOnboarding(false);
     }
   };
 
@@ -168,45 +171,6 @@ export function WirexOnboardFlow() {
     }
   };
 
-  const handleSendSmsConfirmation = async () => {
-    if (!user?.email) return;
-
-    try {
-      setError(null);
-
-      const smsConfirmation = await sendSmsConfirmation(user.email);
-      setSmsSessionId(smsConfirmation.session_id);
-      console.log("SMS confirmation sent");
-    } catch (err) {
-      console.error("Error sending SMS confirmation:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to send SMS confirmation"
-      );
-      // Stay at sms-confirmation step to allow retry
-    }
-  };
-
-  const handleVerifySmsConfirmation = async () => {
-    if (!user?.email || !smsSessionId || !otpCode) return;
-
-    try {
-      setError(null);
-
-      await verifySmsConfirmation(user.email, otpCode, smsSessionId);
-      console.log("SMS confirmation completed");
-
-      // Move to completed step
-      setCurrentStep("completed");
-    } catch (err) {
-      console.error("Error verifying SMS confirmation:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to complete SMS confirmation"
-      );
-    }
-  };
-
   const openVerificationLink = () => {
     if (verificationLink) {
       window.open(verificationLink, "_blank");
@@ -253,14 +217,12 @@ export function WirexOnboardFlow() {
               currentStep === "initial"
                 ? "0%"
                 : currentStep === "onchain-onboarding"
-                ? "20%"
+                ? "25%"
                 : currentStep === "creating-wirex-user"
-                ? "40%"
+                ? "50%"
                 : currentStep === "kyc-verification" ||
                   currentStep === "kyc-pending"
-                ? "60%"
-                : currentStep === "sms-confirmation"
-                ? "80%"
+                ? "75%"
                 : "100%"
             }`,
           }}
@@ -272,7 +234,6 @@ export function WirexOnboardFlow() {
           { label: "Wirex User", step: "creating-wirex-user" },
           { label: "KYC", step: "kyc-verification" },
           { label: "KYC Pending", step: "kyc-pending" },
-          { label: "SMS Confirmation", step: "sms-confirmation" },
           { label: "Complete", step: "completed" },
         ].map((item, index) => (
           <div key={item.step} className="flex flex-col items-center">
@@ -287,7 +248,6 @@ export function WirexOnboardFlow() {
                       "creating-wirex-user",
                       "kyc-verification",
                       "kyc-pending",
-                      "sms-confirmation",
                       "completed",
                     ].indexOf(currentStep)
                   ? "bg-blue-500 text-white"
@@ -337,9 +297,10 @@ export function WirexOnboardFlow() {
             </p>
             <button
               onClick={onChainOnboardUser}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+              disabled={isOnboarding}
+              className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
             >
-              Start Onboarding
+              {isOnboarding ? "Starting..." : "Start Onboarding"}
             </button>
           </div>
         )}
@@ -452,6 +413,13 @@ export function WirexOnboardFlow() {
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500" />
               Polling status...
             </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+              <p className="text-amber-800 text-sm">
+                ⚠️ <strong>Important:</strong> Choose{" "}
+                <strong>United Kingdom</strong> as nationality and use a real
+                postal code such as <strong>SW1A 1AA</strong>.
+              </p>
+            </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-blue-800 text-sm">
                 💡 <strong>Note:</strong> After completing verification, the
@@ -459,57 +427,6 @@ export function WirexOnboardFlow() {
                 the page.
               </p>
             </div>
-          </div>
-        )}
-
-        {currentStep === "sms-confirmation" && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-4">
-              <Image
-                src="/circle-check-big.svg"
-                alt="Check"
-                width={32}
-                height={32}
-                className="opacity-70"
-              />
-              <h3 className="text-lg font-semibold">Almost Done!</h3>
-            </div>
-            <p className="text-gray-600 mb-4">
-              {!smsSessionId
-                ? "Your identity has been verified. Click below to send the SMS confirmation."
-                : "Enter the confirmation code sent to your phone."}
-            </p>
-            {!smsSessionId ? (
-              <button
-                onClick={handleSendSmsConfirmation}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-              >
-                Send SMS Confirmation
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleVerifySmsConfirmation();
-                    }
-                  }}
-                  placeholder="Enter OTP code"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  autoFocus
-                />
-                <button
-                  onClick={handleVerifySmsConfirmation}
-                  disabled={!otpCode}
-                  className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
-                >
-                  Confirm Code
-                </button>
-              </div>
-            )}
           </div>
         )}
 
