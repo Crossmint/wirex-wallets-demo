@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui";
+import { useEffect, useState, useRef } from "react";
+import { useAuth } from "@crossmint/client-sdk-react-ui";
 import {
   getVirtualCards as getVirtualCardsAction,
   getWirexUser,
@@ -10,7 +10,6 @@ import { VirtualCard } from "@/types/card";
 
 export function useWirex() {
   const { user } = useAuth();
-  const { wallet } = useWallet();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("initial");
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
@@ -22,15 +21,23 @@ export function useWirex() {
     null
   );
 
+  // Track if initial check has been performed to prevent re-runs
+  const hasCheckedInitialStatus = useRef(false);
+
   // Derived state - user is approved when verification status is "Approved"
   const isApproved = wirexUser?.verification_status === "Approved";
 
   useEffect(() => {
     const checkInitialStatus = async () => {
-      if (!user?.email) {
-        setIsCheckingStatus(false);
+      // Only run once when user email becomes available
+      if (!user?.email || hasCheckedInitialStatus.current) {
+        if (!user?.email) {
+          setIsCheckingStatus(false);
+        }
         return;
       }
+
+      hasCheckedInitialStatus.current = true;
 
       try {
         // Check if user already has a Wirex account
@@ -43,8 +50,8 @@ export function useWirex() {
         setWirexUser(wirexUser);
         console.log("Found existing Wirex user:", wirexUser);
 
-        if (wallet?.address) {
-          setWalletAddress(wallet.address);
+        if (wirexUser.wallet_address) {
+          setWalletAddress(wirexUser.wallet_address);
         }
 
         // Determine step based on user_actions
@@ -73,7 +80,7 @@ export function useWirex() {
             setCurrentStep("kyc-verification");
           }
         } else if (hasConfirmPhoneAction) {
-          setCurrentStep("sms-confirmation");
+          setCurrentStep("completed");
         } else {
           setCurrentStep("completed");
         }
@@ -85,22 +92,24 @@ export function useWirex() {
     };
 
     checkInitialStatus();
-  }, [user?.email, wallet?.address]);
-
-  async function fetchAndeSetVirtualCards() {
-    if (!isApproved || !user?.email) {
-      console.log("User is not approved, cannot get virtual cards");
-      return;
-    }
-    const virtualCards = await getVirtualCardsAction(user.email);
-    setVirtualCards(virtualCards.data);
-  }
+  }, [user?.email]);
 
   useEffect(() => {
-    if (isApproved && !isCheckingStatus) {
-      fetchAndeSetVirtualCards();
+    fetchAndeSetVirtualCards();
+  }, [isApproved, isCheckingStatus, user?.email]);
+
+  const fetchAndeSetVirtualCards = async () => {
+    if (!isApproved || !user?.email || isCheckingStatus) {
+      return;
     }
-  }, [isApproved, isCheckingStatus]);
+
+    try {
+      const virtualCards = await getVirtualCardsAction(user.email);
+      setVirtualCards(virtualCards.data);
+    } catch (err) {
+      console.error("Error fetching virtual cards:", err);
+    }
+  };
 
   return {
     currentStep,
@@ -119,5 +128,6 @@ export function useWirex() {
     setWirexUser,
     isApproved,
     virtualCards,
+    fetchVirtualCards: fetchAndeSetVirtualCards,
   };
 }
