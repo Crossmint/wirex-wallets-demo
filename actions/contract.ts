@@ -5,7 +5,7 @@ import { getStellarRpcReadService } from "@/lib/StellarReadService";
 const RPC_URL =
   "https://wirex-stellar-testnet-34SCaj4sg.zeeve.net/spn0aX54NRWB1IO4DBmUBLQP/rpc";
 const CONTRACTS_REGISTRY =
-  "CBMN6DUCFRTX6BMTA6DQESWAD75CJH7TW2UKNQRO33TLB2RS2Y3DCVXE";
+  "CBI44PUQEKP2IAD77ZPCTN2QX2IOWOSY5VYHI3SPBN4CAZY6BHR7KIVE";
 
 export async function getContracts() {
   try {

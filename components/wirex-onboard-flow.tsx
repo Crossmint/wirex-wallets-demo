@@ -91,7 +91,7 @@ export function WirexOnboardFlow() {
       // Before crossmint contract wallet is broadcasted, we need to create a dummy txn first
       const stellarWallet = StellarWallet.from(crossmintWallet);
       await stellarWallet.sendTransaction({
-        contractId: "CBOZPWLMG5AOFP35REWBR6QEC7MBQ6TR26HODG5MLRXTW2DPH3ZOT3JD",
+        contractId: "CCL3QAGNIJA7YOIDD4BELFN4DQSVT4YF3DPJHR2GABK7OJUDMYAVZA4V",
         method: "hello_requires_auth",
         args: {
           caller: crossmintWallet.address,
