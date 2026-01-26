@@ -3,6 +3,7 @@ import { useAuth } from "@crossmint/client-sdk-react-ui";
 import {
   getVirtualCards as getVirtualCardsAction,
   getWirexUser,
+  getVerificationLink,
   WirexUser,
 } from "@/actions/wirex";
 import { OnboardingStep } from "@/components/wirex-onboard-flow";
@@ -71,6 +72,15 @@ export function useWirex() {
           // No pending actions - user is fully onboarded
           setCurrentStep("completed");
         } else if (hasVerifyKYCAction) {
+          // Fetch verification link for existing users needing KYC
+          try {
+            const link = await getVerificationLink(user.email);
+            setVerificationLink(link);
+            console.log("Fetched verification link for existing user:", link);
+          } catch (err) {
+            console.error("Failed to fetch verification link:", err);
+          }
+
           if (
             wirexUser.verification_status === "Pending" ||
             wirexUser.verification_status === "InReview"
