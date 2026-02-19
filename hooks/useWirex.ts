@@ -3,6 +3,7 @@ import { useAuth } from "@crossmint/client-sdk-react-ui";
 import {
   getVirtualCards as getVirtualCardsAction,
   getWirexUser,
+  getWirexWallets,
   getVerificationLink,
   WirexUser,
 } from "@/actions/wirex";
@@ -21,6 +22,8 @@ export function useWirex() {
   const [virtualCards, setVirtualCards] = useState<Array<VirtualCard> | null>(
     null
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [walletBalances, setWalletBalances] = useState<any>(null);
 
   // Track if initial check has been performed to prevent re-runs
   const hasCheckedInitialStatus = useRef(false);
@@ -106,6 +109,7 @@ export function useWirex() {
 
   useEffect(() => {
     fetchAndeSetVirtualCards();
+    fetchWalletBalances();
   }, [isApproved, isCheckingStatus, user?.email]);
 
   const fetchAndeSetVirtualCards = async () => {
@@ -118,6 +122,19 @@ export function useWirex() {
       setVirtualCards(virtualCards.data);
     } catch (err) {
       console.error("Error fetching virtual cards:", err);
+    }
+  };
+
+  const fetchWalletBalances = async () => {
+    if (!isApproved || !user?.email || isCheckingStatus) {
+      return;
+    }
+
+    try {
+      const wallets = await getWirexWallets(user.email);
+      setWalletBalances(wallets);
+    } catch (err) {
+      console.error("Error fetching wallet balances:", err);
     }
   };
 
@@ -138,6 +155,8 @@ export function useWirex() {
     setWirexUser,
     isApproved,
     virtualCards,
+    walletBalances,
     fetchVirtualCards: fetchAndeSetVirtualCards,
+    fetchWalletBalances,
   };
 }

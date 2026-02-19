@@ -1,7 +1,8 @@
 import { StellarWallet, useWallet } from "@crossmint/client-sdk-react-ui";
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Plus } from "lucide-react";
+import { Eye, EyeOff, Plus, RefreshCw, Wallet } from "lucide-react";
 import {
+  fundTestnetCard,
   getCardCvvAndNumber,
   issueVirtualCard,
   verifyWalletSignature,
@@ -11,8 +12,14 @@ import { VirtualCardDetails } from "@/types/card";
 
 export function WirexDashboard() {
   const { getOrCreateWallet, wallet, status } = useWallet();
-  const { virtualCards, wirexUser, fetchVirtualCards, isCheckingStatus } =
-    useWirex();
+  const {
+    virtualCards,
+    wirexUser,
+    fetchVirtualCards,
+    isCheckingStatus,
+    walletBalances,
+    fetchWalletBalances,
+  } = useWirex();
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
   const [cardDetails, setCardDetails] = useState<
     Record<string, VirtualCardDetails>
@@ -20,6 +27,11 @@ export function WirexDashboard() {
   const [unmaskingCard, setUnmaskingCard] = useState<string | null>(null);
   const [isWalletInitialized, setIsWalletInitialized] = useState(false);
   const [isIssuingCard, setIsIssuingCard] = useState(false);
+  const [isFunding, setIsFunding] = useState(false);
+  const [fundResult, setFundResult] = useState<{
+    hash: string;
+    status: string;
+  } | null>(null);
 
   useEffect(() => {
     if (wirexUser?.wallet_address == null || isWalletInitialized) {
@@ -117,6 +129,27 @@ export function WirexDashboard() {
       delete next[cardId];
       return next;
     });
+  };
+
+  const handleFundCard = async () => {
+    if (!wallet?.address) {
+      console.error("Crossmint wallet not found");
+      return;
+    }
+
+    setIsFunding(true);
+    setFundResult(null);
+    try {
+      const result = await fundTestnetCard(wallet.address);
+      setFundResult(result);
+      console.log("Fund result:", result);
+      // Refresh wallet balances after funding
+      await fetchWalletBalances();
+    } catch (err) {
+      console.error("Error funding card:", err);
+    } finally {
+      setIsFunding(false);
+    }
   };
 
   // Show loading state while wallet is being created or virtual cards are being fetched
@@ -289,33 +322,89 @@ export function WirexDashboard() {
               <div className="absolute -left-8 -top-8 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
             </div>
 
-            {/* Unmask Button */}
-            <button
-              onClick={() =>
-                cardDetails[selectedCard.id]
-                  ? handleMaskCard(selectedCard.id)
-                  : handleUnmaskCard(selectedCard.id)
-              }
-              disabled={unmaskingCard === selectedCard.id}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            >
-              {unmaskingCard === selectedCard.id ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
-                  <span>Loading...</span>
-                </>
-              ) : cardDetails[selectedCard.id] ? (
-                <>
-                  <EyeOff className="w-4 h-4" />
-                  <span>Hide Card Details</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-4 h-4" />
-                  <span>Show Full Card Number</span>
-                </>
-              )}
-            </button>
+            {/* Card Action Buttons */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() =>
+                  cardDetails[selectedCard.id]
+                    ? handleMaskCard(selectedCard.id)
+                    : handleUnmaskCard(selectedCard.id)
+                }
+                disabled={unmaskingCard === selectedCard.id}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                {unmaskingCard === selectedCard.id ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : cardDetails[selectedCard.id] ? (
+                  <>
+                    <EyeOff className="w-4 h-4" />
+                    <span>Hide Details</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" />
+                    <span>Show Details</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleFundCard}
+                disabled={isFunding || !wallet?.address}
+                className="flex items-center justify-center gap-2 py-3 px-4 bg-green-600 hover:bg-green-700 text-white border border-green-700 rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                {isFunding ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-green-300 border-t-white rounded-full animate-spin" />
+                    <span>Funding...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="w-4 h-4" />
+                    <span>Fund Card (USDC)</span>
+                  </>
+                )}
+              </button>
+            </div>
+            {fundResult && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                <p className="font-medium">Funded successfully!</p>
+                <p className="text-xs font-mono mt-1 break-all">
+                  TX: {fundResult.hash}
+                </p>
+                <p className="text-xs text-green-600 mt-2">
+                  Note: The Wirex API may take a few extra seconds to reflect the updated balance.
+                </p>
+              </div>
+            )}
+
+            {/* Wallet Balance Dropdown */}
+            <details className="bg-white border border-gray-200 rounded-lg shadow-sm">
+              <summary className="flex items-center justify-between cursor-pointer px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <span>Wallet Balances</span>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    fetchWalletBalances();
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Refresh balance"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </summary>
+              <div className="px-4 pb-4">
+                {walletBalances ? (
+                  <pre className="text-xs text-gray-700 bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64 overflow-y-auto">
+                    {JSON.stringify(walletBalances, null, 2)}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-gray-400">Loading...</p>
+                )}
+              </div>
+            </details>
           </div>
 
           {/* Card List */}

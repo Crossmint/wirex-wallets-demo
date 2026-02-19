@@ -277,6 +277,26 @@ export async function verifySmsConfirmation(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getWirexWallets(email: string): Promise<any> {
+  const token = await getWirexToken();
+  const response = await fetch(`${WIREX_API_BASE}/wallets`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-Chain-Id": WIREX_CHAIN_ID,
+      "X-User-Email": email,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to get wallets: ${error}`);
+  }
+
+  return await response.json();
+}
+
 export async function issueVirtualCard(email: string, fullName: string) {
   const token = await getWirexToken();
   const response = await fetch(`${WIREX_API_BASE}/cards/virtual`, {
@@ -347,6 +367,35 @@ export async function verifyWalletSignature(
   }
   const responseData = await response.json();
   return responseData.action_token as string;
+}
+
+const WIREX_MINT_URL = "https://ramc.wirexapp.tech/account/retail/mint";
+const WIREX_USDC_TESTNET_TOKEN_CONTRACT =
+  "CAUGJT4GREIY3WHOUUU5RIUDGSPVREF5CDCYJOWMHOVT2GWQT5JEETGJ";
+
+export async function fundTestnetCard(
+  walletAddress: string
+): Promise<{ hash: string; status: string }> {
+  const response = await fetch(WIREX_MINT_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      chainId: WIREX_CHAIN_ID,
+      token: WIREX_USDC_TESTNET_TOKEN_CONTRACT,
+      to: walletAddress,
+      amount: "10000000",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to fund testnet card: ${error}`);
+  }
+
+  return await response.json();
 }
 
 export async function getCardCvvAndNumber(
