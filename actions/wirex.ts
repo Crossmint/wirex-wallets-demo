@@ -2,10 +2,8 @@
 
 import { VirtualCardDetails } from "@/types/card";
 
-const WIREX_AUTH_URL = "https://wirex-pay-dev.eu.auth0.com/oauth/token";
 const WIREX_API_BASE = "https://api-baas.wirexapp.tech/api/v1";
 const WIREX_CHAIN_ID = "9223372036854775806";
-const WIREX_AUDIENCE = "https://api-business.wirexpaychain.tech";
 
 const WIREX_CLIENT_ID = process.env.WIREX_CLIENT_ID;
 const WIREX_CLIENT_SECRET = process.env.WIREX_CLIENT_SECRET;
@@ -78,7 +76,7 @@ async function getWirexToken(): Promise<string> {
     return cachedToken.token;
   }
 
-  const response = await fetch(WIREX_AUTH_URL, {
+  const response = await fetch(`${WIREX_API_BASE}/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -86,7 +84,6 @@ async function getWirexToken(): Promise<string> {
     body: JSON.stringify({
       client_id: WIREX_CLIENT_ID,
       client_secret: WIREX_CLIENT_SECRET,
-      audience: WIREX_AUDIENCE,
       grant_type: "client_credentials",
     }),
   });
