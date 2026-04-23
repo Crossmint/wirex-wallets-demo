@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef } from "react";
-import { useAuth } from "@crossmint/client-sdk-react-ui";
+import { useCrossmintAuth } from "@crossmint/client-sdk-react-ui";
 import { CSSTransition, SwitchTransition } from "react-transition-group";
 import { LandingPage } from "@/components/landing-page";
 import { Dashboard } from "@/components/dashboard";
 
 export default function Home() {
-  const { status: authStatus } = useAuth();
+  const { status: authStatus } = useCrossmintAuth();
   const nodeRef = useRef(null);
 
   return (
