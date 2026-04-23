@@ -1,10 +1,10 @@
 "use client";
 
-import { useAuth } from "@crossmint/client-sdk-react-ui";
+import { useCrossmintAuth } from "@crossmint/client-sdk-react-ui";
 import Image from "next/image";
 
 export function LoginButton() {
-  const { login } = useAuth();
+  const { login } = useCrossmintAuth();
 
   return (
     <button

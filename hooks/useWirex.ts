@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useAuth } from "@crossmint/client-sdk-react-ui";
+import { useCrossmintAuth } from "@crossmint/client-sdk-react-ui";
 import {
   getVirtualCards as getVirtualCardsAction,
   getWirexUser,
@@ -11,7 +11,7 @@ import { OnboardingStep } from "@/components/wirex-onboard-flow";
 import { VirtualCard } from "@/types/card";
 
 export function useWirex() {
-  const { user } = useAuth();
+  const { user } = useCrossmintAuth();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("initial");
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);

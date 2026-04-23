@@ -1,4 +1,4 @@
-import { useAuth } from "@crossmint/client-sdk-react-ui";
+import { useCrossmintAuth } from "@crossmint/client-sdk-react-ui";
 import Image from "next/image";
 import { useWirex } from "@/hooks/useWirex";
 import { Footer } from "./footer";
@@ -7,7 +7,7 @@ import { WirexOnboardFlow } from "./wirex-onboard-flow";
 import { WirexDashboard } from "./wirex-dashboard";
 
 export function Dashboard() {
-  const { status: authStatus } = useAuth();
+  const { status: authStatus } = useCrossmintAuth();
   const { isApproved, isCheckingStatus } = useWirex();
 
   // Show loading state while auth is initializing or checking Wirex status
