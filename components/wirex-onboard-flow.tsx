@@ -1,6 +1,6 @@
 import {
   StellarWallet,
-  useAuth,
+  useCrossmintAuth,
   useWallet,
   Wallet,
 } from "@crossmint/client-sdk-react-ui";
@@ -24,8 +24,8 @@ export type OnboardingStep =
   | "completed";
 
 export function WirexOnboardFlow() {
-  const { user } = useAuth();
-  const { getOrCreateWallet } = useWallet();
+  const { user } = useCrossmintAuth();
+  const { createWallet } = useWallet();
   const [isOnboarding, setIsOnboarding] = useState(false);
 
   const {
@@ -70,16 +70,16 @@ export function WirexOnboardFlow() {
       }
 
       // Create a wallet for the user (client side)
-      const crossmintWallet = (await getOrCreateWallet({
+      const crossmintWallet = (await createWallet({
         chain: "stellar",
         plugins: [contracts.ExecutionDelayPolicy],
-        signer: {
+        recovery: {
           type: "email",
           email: user.email,
         },
-        delegatedSigners: [{ signer: "external-wallet:" + fundsOracle }],
+        signers: [{ type: "external-wallet", address: fundsOracle }],
       })) as Wallet<"stellar">;
-      const signerAddress = crossmintWallet.signer.address?.();
+      const signerAddress = crossmintWallet.signer?.address?.();
 
       if (signerAddress == null) {
         // should never happen but just to satisfy TS
@@ -98,7 +98,7 @@ export function WirexOnboardFlow() {
         },
       });
       // Create a user account with the wallet tied to the partner id
-      const corpReg = await stellarWallet.sendTransaction({
+      await stellarWallet.sendTransaction({
         contractId: contracts.Accounts,
         method: "create_user_account_with_wallet",
         args: {

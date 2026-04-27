@@ -11,7 +11,7 @@ import { useWirex } from "@/hooks/useWirex";
 import { VirtualCardDetails } from "@/types/card";
 
 export function WirexDashboard() {
-  const { getOrCreateWallet, wallet, status } = useWallet();
+  const { getWallet, wallet, status } = useWallet();
   const {
     virtualCards,
     wirexUser,
@@ -41,10 +41,7 @@ export function WirexDashboard() {
     // Populate the wallet only once
     const initWallet = async () => {
       try {
-        await getOrCreateWallet({
-          chain: "stellar",
-          signer: { type: "email" },
-        });
+        await getWallet({ chain: "stellar" });
         setIsWalletInitialized(true);
       } catch (err) {
         console.error("Error initializing wallet:", err);
@@ -52,7 +49,7 @@ export function WirexDashboard() {
     };
 
     initWallet();
-  }, [wirexUser?.wallet_address, isWalletInitialized, getOrCreateWallet]);
+  }, [wirexUser?.wallet_address, isWalletInitialized, getWallet]);
 
   const issueVirtualCardHandler = async () => {
     if (!wirexUser?.email) {
@@ -86,6 +83,9 @@ export function WirexDashboard() {
     setUnmaskingCard(cardId);
     try {
       const stellarWallet = StellarWallet.from(wallet);
+      if (stellarWallet.signer == null) {
+        throw new Error("Wallet signer is not available");
+      }
       const messageArgs = {
         actionType: "GetCardDetails" as const,
         nonce: Date.now(),
